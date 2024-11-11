@@ -135,6 +135,9 @@ pipeline {
                 string(credentialsId: 'GITHUB_TOKEN', variable: 'GITHUB_TOKEN'),
                 string(credentialsId: 'DOCKERHUB_IMAGE_TAG', variable: 'DOCKERHUB_IMAGE_TAG')
             ]) {
+
+                 // Clean the workspace directory before cloning
+                sh 'rm -rf ./*'
                 
                 // Clone the repository
                 sh 'git clone https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/gcp-online-boutique-microservices.git .'
