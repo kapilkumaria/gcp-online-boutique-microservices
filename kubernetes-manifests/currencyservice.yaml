@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: currencyservice
-          image: kappu1512/currencyservice:latest  # Replace with your actual image path
+          image: kappu1512/currencyservice:6
           ports:
             - containerPort: 7000
           env:
