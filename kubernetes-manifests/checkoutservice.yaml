@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkoutservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: checkoutservice
+  template:
+    metadata:
+      labels:
+        app: checkoutservice
+    spec:
+      containers:
+        - name: checkoutservice
+          image: kappu1512/checkoutservice:latest
+          ports:
+            - containerPort: 5050
+          env:
+            - name: SHIPPING_SERVICE_ADDR
+              value: "shippingservice:50051"  # DNS of shippingservice
+            - name: PRODUCT_CATALOG_SERVICE_ADDR
+              value: "productcatalogservice:3550"  # DNS of productcatalogservice
+            - name: CART_SERVICE_ADDR
+              value: "cartservice:7070"  # DNS of cartservice
+            - name: CURRENCY_SERVICE_ADDR
+              value: "currencyservice:7000"  # DNS of currencyservice
+            - name: EMAIL_SERVICE_ADDR
+              value: "emailservice:8080"  # DNS of emailservice
+            - name: PAYMENT_SERVICE_ADDR
+              value: "paymentservice:50051"  # DNS of paymentservice
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkoutservice
+  labels:
+    app: checkoutservice
+spec:
+  type: ClusterIP  # Internal service only, accessible within the cluster
+  selector:
+    app: checkoutservice
+  ports:
+    - protocol: TCP
+      port: 5050        # Port on which this service will be accessible within the cluster
+      targetPort: 5050  # Port on the pod where the container is listening

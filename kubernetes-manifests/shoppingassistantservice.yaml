@@ -1,0 +1,42 @@
+# shoppingassistantservice Deployment and Service combined YAML
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shoppingassistantservice
+  labels:
+    app: shoppingassistantservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shoppingassistantservice
+  template:
+    metadata:
+      labels:
+        app: shoppingassistantservice
+    spec:
+      containers:
+        - name: shoppingassistantservice
+          image: kappu1512/shoppingassistantservice:latest  # Replace with your actual image path
+          ports:
+            - containerPort: 8080  # Replace with the actual port the service listens on
+          env:
+            - name: EXAMPLE_ENV
+              value: "example-value"  # Add any required environment variables here
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shoppingassistantservice
+  labels:
+    app: shoppingassistantservice
+spec:
+  type: ClusterIP  # Internal service only, accessible within the cluster
+  selector:
+    app: shoppingassistantservice
+  ports:
+    - protocol: TCP
+      port: 8080        # Port on which this service will be accessible within the cluster
+      targetPort: 8080  # Port on the pod where the container is listening (replace if needed)

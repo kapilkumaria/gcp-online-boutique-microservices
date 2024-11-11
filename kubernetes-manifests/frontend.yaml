@@ -1,0 +1,58 @@
+# frontend Deployment and Service combined YAML
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: kappu1512/frontend:latest  # Replace with your actual image path
+          ports:
+            - containerPort: 8080
+          env:
+            - name: GOTRACEBACK
+              value: "single"
+            - name: PRODUCT_CATALOG_SERVICE_ADDR
+              value: "productcatalogservice:3550"  # Address of productcatalogservice
+            - name: CURRENCY_SERVICE_ADDR
+              value: "currencyservice:7000"  # Address of currencyservice
+            - name: CART_SERVICE_ADDR
+              value: "cartservice:7070"  # Address of cartservice
+            - name: RECOMMENDATION_SERVICE_ADDR
+              value: "recommendationservice:8082"  # Address of recommendationservice
+            - name: CHECKOUT_SERVICE_ADDR
+              value: "checkoutservice:5050"  # Address of checkoutservice
+            - name: SHIPPING_SERVICE_ADDR
+              value: "shippingservice:50051"  # Address of shippingservice
+            - name: AD_SERVICE_ADDR
+              value: "adservice:9555"  # Address of adservice
+            - name: SHOPPING_ASSISTANT_SERVICE_ADDR
+              value: "shoppingassistantservice:XXXX"  # Replace XXXX with the actual port if known
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  labels:
+    app: frontend
+spec:
+  type: ClusterIP  # Use LoadBalancer if external access is needed
+  selector:
+    app: frontend
+  ports:
+    - protocol: TCP
+      port: 8080        # Port on which this service will be accessible within the cluster
+      targetPort: 8080  # Port on the pod where the container is listening

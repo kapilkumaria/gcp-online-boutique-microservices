@@ -1,0 +1,42 @@
+# shippingservice Deployment and Service combined YAML
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shippingservice
+  labels:
+    app: shippingservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shippingservice
+  template:
+    metadata:
+      labels:
+        app: shippingservice
+    spec:
+      containers:
+        - name: shippingservice
+          image: kappu1512/shippingservice:latest  # Replace with your actual image path
+          ports:
+            - containerPort: 50051
+          env:
+            - name: GOTRACEBACK
+              value: "single"  # Set the GOTRACEBACK environment variable as per Docker Compose
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shippingservice
+  labels:
+    app: shippingservice
+spec:
+  type: ClusterIP  # Internal service only, accessible within the cluster
+  selector:
+    app: shippingservice
+  ports:
+    - protocol: TCP
+      port: 50051        # Port on which this service will be accessible within the cluster
+      targetPort: 50051  # Port on the pod where the container is listening

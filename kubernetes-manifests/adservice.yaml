@@ -1,0 +1,43 @@
+# adservice Deployment and Service combined YAML
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adservice
+  labels:
+    app: adservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: adservice
+  template:
+    metadata:
+      labels:
+        app: adservice
+    spec:
+      containers:
+        - name: adservice
+          image: kappu1512/adservice:144
+          ports:
+            - containerPort: 9555
+          env:
+            # Add environment variables if required
+            - name: EXAMPLE_ENV
+              value: "example-value"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: adservice
+  labels:
+    app: adservice
+spec:
+  type: ClusterIP  # Internal service only, accessible within the cluster
+  selector:
+    app: adservice
+  ports:
+    - protocol: TCP
+      port: 9555        # Port on which this service will be accessible within the cluster
+      targetPort: 9555  # Port on the pod where the container is listening

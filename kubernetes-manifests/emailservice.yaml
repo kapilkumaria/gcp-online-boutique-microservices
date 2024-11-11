@@ -1,0 +1,44 @@
+# emailservice Deployment and Service combined YAML
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emailservice
+  labels:
+    app: emailservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: emailservice
+  template:
+    metadata:
+      labels:
+        app: emailservice
+    spec:
+      containers:
+        - name: emailservice
+          image: kappu1512/emailservice:latest  # Replace with your actual image path
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: ENABLE_PROFILER
+              value: "1"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: emailservice
+  labels:
+    app: emailservice
+spec:
+  type: ClusterIP  # Internal service only, accessible within the cluster
+  selector:
+    app: emailservice
+  ports:
+    - protocol: TCP
+      port: 8080        # Port on which this service will be accessible within the cluster
+      targetPort: 8080  # Port on the pod where the container is listening

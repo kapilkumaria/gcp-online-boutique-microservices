@@ -1,0 +1,40 @@
+# loadgenerator Deployment and Service combined YAML
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgenerator
+  labels:
+    app: loadgenerator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loadgenerator
+  template:
+    metadata:
+      labels:
+        app: loadgenerator
+    spec:
+      containers:
+        - name: loadgenerator
+          image: kappu1512/loadgenerator:latest  # Replace with your actual image path
+          env:
+            - name: GEVENT_SUPPORT
+              value: "True"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loadgenerator
+  labels:
+    app: loadgenerator
+spec:
+  type: ClusterIP  # Internal service only, accessible within the cluster
+  selector:
+    app: loadgenerator
+  ports:
+    - protocol: TCP
+      port: 8089        # Example port if loadgenerator listens on 8089 internally, change if needed
+      targetPort: 8089  # Port on the pod where the container is listening
