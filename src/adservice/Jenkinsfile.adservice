@@ -7,7 +7,7 @@ pipeline {
     }
 
     environment {
-        REPO_URL = 'https://github.com/kapilkumaria/microservices-demo-sample.git' // Repository URL
+        REPO_URL = 'https://github.com/kapilkumaria/gcp-online-boutique-microservices.git' // Repository URL
         SONARQUBE_SERVER = 'sonarQube' // SonarQube server name configured in Jenkins
         SONARQUBE_URL = 'http://52.2.64.174:9000' // SonarQube server URL
         SONARQUBE_TOKEN = credentials('sonar-token') // SonarQube token stored in Jenkins
@@ -26,7 +26,7 @@ pipeline {
         stage('Clone Repository') {
             steps {
                 echo "Cloning the repository from ${REPO_URL} for ${SERVICE_NAME}"
-                git url: "${REPO_URL}", branch: 'feature/jenkinsfile-adservice' // Clone specified branch
+                git url: "${REPO_URL}", branch: 'feature/cicd' // Clone specified branch
             }
         }
         
@@ -79,6 +79,7 @@ pipeline {
                       aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 931058976119.dkr.ecr.us-east-1.amazonaws.com
                       docker tag ${SERVICE_NAME}:latest ${ECR_REPO_MICROSERVICES}:${BUILD_NUMBER}
                       docker push ${ECR_REPO_MICROSERVICES}:${BUILD_NUMBER}
+                      docker logout 931058976119.dkr.ecr.us-east-1.amazonaws.com
                     '''
                 }
             }
@@ -133,12 +134,10 @@ pipeline {
                 string(credentialsId: 'GITHUB_TOKEN', variable: 'GITHUB_TOKEN'),
                 string(credentialsId: 'DOCKERHUB_IMAGE_TAG', variable: 'DOCKERHUB_IMAGE_TAG')
             ]) {
-                // Ensure a clean workspace by deleting all files, including hidden ones
-                sh 'rm -rf .* *'
-
-                // Clone the repository afresh
-                sh 'git clone https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/online-boutique-microservices.git .'
-                sh 'git checkout feature/kubernetes-manifests'
+                
+                // Clone the repository
+                sh 'git clone https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/gcp-online-boutique-microservices.git .'
+                
 
                 // Modify the manifest file with the new DockerHub image tag
                 def newImageTag = "${DOCKERHUB_IMAGE_TAG}/${SERVICE_NAME}:${BUILD_NUMBER}"
@@ -152,26 +151,18 @@ pipeline {
                     git config user.email "jenkins-bot@yourdomain.com"
                     git add kubernetes-manifests/adservice.yaml
                     git commit -m "Update image tag for ${SERVICE_NAME} to DockerHub ${BUILD_NUMBER}"
-                    git push https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/online-boutique-microservices.git HEAD:feature/kubernetes-manifests
-                """
-
-                // Return to the original branch (if required)
-                sh 'git checkout feature/jenkinsfile-adservice'
+                    git push https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/gcp-online-boutique-microservices.git
+                """                
             }
-        }
-    }
-}
-
-
-
-
-}
-
-    
+         }
+     }
+   }
+}    
 
     post {
         success {
             echo "Pipeline completed successfully for ${SERVICE_NAME}!"
+            docker system prune -f
         }
         failure {
             echo "Pipeline failed for ${SERVICE_NAME}. Please check logs for details."
