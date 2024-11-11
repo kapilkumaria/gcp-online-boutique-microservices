@@ -162,7 +162,7 @@ pipeline {
     post {
         success {
             echo "Pipeline completed successfully for ${SERVICE_NAME}!"
-            docker system prune -f
+            sh 'docker system prune -f'
         }
         failure {
             echo "Pipeline failed for ${SERVICE_NAME}. Please check logs for details."
