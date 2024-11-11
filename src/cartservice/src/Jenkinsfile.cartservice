@@ -1,0 +1,229 @@
+pipeline {
+    agent { label 'dev' } // Main Jenkins agent with the 'dev' label
+    parameters {
+        booleanParam(name: 'PUSH_TO_ECR', defaultValue: true, description: 'Push image to AWS ECR')
+        booleanParam(name: 'PUSH_TO_ARTIFACTORY', defaultValue: false, description: 'Push image to JFrog Artifactory')
+        booleanParam(name: 'PUSH_TO_DOCKERHUB', defaultValue: false, description: 'Push image to DockerHub')
+    }
+
+    environment {
+        REPO_URL = 'https://github.com/kapilkumaria/microservices-demo-sample.git'
+        SONARQUBE_SERVER = 'sonarQube'
+        SONARQUBE_URL = 'http://52.2.64.174:9000'
+        SONARQUBE_TOKEN = credentials('sonar-token') // SonarQube token stored in Jenkins
+        SERVICE_NAME = 'cartservice'
+        ECR_REPO_MICROSERVICES = '931058976119.dkr.ecr.us-east-1.amazonaws.com/gcp-cartservice'
+        PATH = "/usr/share/dotnet:/usr/bin:${env.PATH}"
+    }
+    
+    stages {
+        stage('Setup Environment') {
+            steps {
+                echo "Installing Docker, Dotnet SDK, and SonarScanner if not already installed"
+                sh '''
+                    # Check if Docker is installed
+                    if ! command -v docker &> /dev/null; then
+                        echo "Docker not found, installing..."
+                        curl -fsSL https://get.docker.com | sh
+                        sudo usermod -aG docker $USER
+                        newgrp docker
+                    else
+                        echo "Docker is already installed"
+                    fi
+                    
+                    # Install Dotnet SDK
+                    DOTNET_VERSION=8.0.100
+                    DOTNET_DOWNLOAD_URL="https://dotnetcli.azureedge.net/dotnet/Sdk/$DOTNET_VERSION/dotnet-sdk-$DOTNET_VERSION-linux-x64.tar.gz"
+                    INSTALL_DIR="/usr/share/dotnet"
+
+                    sudo rm -rf $INSTALL_DIR
+                    sudo mkdir -p $INSTALL_DIR
+
+                    curl -L $DOTNET_DOWNLOAD_URL -o dotnet-sdk.tar.gz
+                    sudo tar -zxf dotnet-sdk.tar.gz -C $INSTALL_DIR
+                    rm dotnet-sdk.tar.gz
+
+                    export PATH="$INSTALL_DIR:$PATH"
+                    echo "PATH after installation: $PATH"
+
+                    # Install dotnet-sonarscanner as a global tool if not already installed
+                    if ! dotnet tool list -g | grep -q dotnet-sonarscanner; then
+                        echo "Installing dotnet-sonarscanner"
+                        dotnet tool install --global dotnet-sonarscanner
+                    else
+                        echo "dotnet-sonarscanner is already installed"
+                    fi
+
+                    export PATH="$PATH:$HOME/.dotnet/tools"  # Make sure global tools are accessible
+
+                    # Verify installations
+                    docker --version
+                    dotnet --version
+                    dotnet sonarscanner --version || echo "SonarScanner installation verification failed; please check setup steps."
+                '''
+            }
+        }
+
+        stage('Clone Repository') {
+            steps {
+                echo "Cloning the repository from ${REPO_URL} for ${SERVICE_NAME}"
+                git url: "${REPO_URL}", branch: 'feature/jenkinsfile-cartservice'
+            }
+        }
+
+        stage('Restore Dependencies and SonarQube Analysis') {
+            steps {
+                script {
+                    withSonarQubeEnv('sonarQube') {
+                        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONARQUBE_TOKEN')]) {
+                            sh '''
+                                export PATH="/usr/share/dotnet:$PATH:$HOME/.dotnet/tools"  # Ensure sonarscanner is on PATH
+                                cd src/cartservice
+                                dotnet restore
+                                dotnet sonarscanner begin \
+                                    /k:"${SERVICE_NAME}" \
+                                    /d:sonar.host.url="${SONARQUBE_URL}" \
+                                    /d:sonar.login="$SONARQUBE_TOKEN"
+
+                                # Build the project after starting SonarQube analysis
+                                dotnet build --no-incremental
+
+                                # End the SonarQube analysis
+                                dotnet sonarscanner end \
+                                    /d:sonar.login="$SONARQUBE_TOKEN"
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                echo "Building Docker image for ${SERVICE_NAME}"
+                sh """
+                    docker build -t ${SERVICE_NAME}:latest -f src/cartservice/src/Dockerfile src/cartservice/src
+                """
+            }
+        }
+
+        stage('Push AdService Image to AWS ECR') {
+           when {
+               expression { params.PUSH_TO_ECR }
+           }
+    
+           steps {
+               withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    
+                ]) {
+                    sh '''
+                      aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 931058976119.dkr.ecr.us-east-1.amazonaws.com
+                      docker tag ${SERVICE_NAME}:latest ${ECR_REPO_MICROSERVICES}:${BUILD_NUMBER}
+                      docker push ${ECR_REPO_MICROSERVICES}:${BUILD_NUMBER}
+                    '''
+                    }
+             }
+         }
+
+         
+        stage('Push AdService Image to JFrog Artifactory') {
+            when {
+                expression { params.PUSH_TO_ARTIFACTORY }
+            }
+            steps {
+              withCredentials([
+                    string(credentialsId: 'JFROG_URL', variable: 'JFROG_URL'),
+                    string(credentialsId: 'JFROG_USERNAME', variable: 'JFROG_USERNAME'),
+                    string(credentialsId: 'JFROG_TOKEN', variable: 'JFROG_TOKEN'),
+                    string(credentialsId: 'JFROG_IMAGE_TAG', variable: 'JFROG_IMAGE_TAG')                    
+                ]) {
+                sh '''
+ 
+                  echo "$JFROG_TOKEN" | docker login "$JFROG_URL" --username "$JFROG_USERNAME" --password-stdin
+
+                  docker tag $SERVICE_NAME:latest $JFROG_IMAGE_TAG/$SERVICE_NAME:$BUILD_NUMBER
+                  docker push $JFROG_IMAGE_TAG/$SERVICE_NAME:$BUILD_NUMBER
+                '''
+                echo "Web image pushed to JFrog Artifactory successfully."
+                }
+            }
+        }
+
+         stage('Push AdService Image to DockerHub') {
+            when {
+                expression { params.PUSH_TO_DOCKERHUB }
+            }
+            steps {
+              withCredentials([
+                    string(credentialsId: 'DOCKERHUB_URL', variable: 'DOCKERHUB_URL'), 
+                    string(credentialsId: 'DOCKERHUB_USERNAME', variable: 'DOCKERHUB_USERNAME'),
+                    string(credentialsId: 'DOCKERHUB_TOKEN', variable: 'DOCKERHUB_TOKEN'),
+                    string(credentialsId: 'DOCKERHUB_IMAGE_TAG', variable: 'DOCKERHUB_IMAGE_TAG'),
+
+              ]) {
+                sh '''
+                  echo "$DOCKERHUB_TOKEN" | docker login "$DOCKERHUB_URL" --username "$DOCKERHUB_USERNAME" --password-stdin
+                  docker tag $SERVICE_NAME:latest $DOCKERHUB_IMAGE_TAG/$SERVICE_NAME:$BUILD_NUMBER
+                  docker push $DOCKERHUB_IMAGE_TAG/$SERVICE_NAME:$BUILD_NUMBER
+                '''
+                echo "Web image pushed to DockerHub successfully."
+                }
+            }
+        }
+
+        stage('Update Kubernetes Manifest for ArgoCD') {
+            steps {
+                script {
+                    def manifestFile = "kubernetes-manifests/cartservice.yaml"
+
+                    withCredentials([
+                        string(credentialsId: 'GITHUB_TOKEN', variable: 'GITHUB_TOKEN'),
+                        string(credentialsId: 'DOCKERHUB_IMAGE_TAG', variable: 'DOCKERHUB_IMAGE_TAG')
+                    ]) {
+                        // Stash changes if needed (optional)
+                        sh 'git stash'
+
+                        // Check out the branch with the Kubernetes manifests
+                        sh 'git fetch origin feature/kubernetes-manifests'
+                        sh 'git checkout feature/kubernetes-manifests'
+
+                        // Modify the manifest file with the new DockerHub image tag
+                        def newImageTag = "${DOCKERHUB_IMAGE_TAG}/${SERVICE_NAME}:${BUILD_NUMBER}"
+                        sh """
+                            export DOCKERHUB_IMAGE_TAG=${DOCKERHUB_IMAGE_TAG}
+                            export SERVICE_NAME=${SERVICE_NAME}
+                            export BUILD_NUMBER=${BUILD_NUMBER}
+                            sed -i 's|image: .*|image: ${newImageTag}|g' ${manifestFile}
+                        """
+
+                        // Commit and push the changes to the kubernetes manifests branch
+                        sh """
+                            git config user.name "jenkins-bot"
+                            git config user.email "jenkins-bot@yourdomain.com"
+                            git add ${manifestFile}
+                            git commit -m "Update image tag for ${SERVICE_NAME} to DockerHub ${BUILD_NUMBER}"
+                            git push https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/microservices-demo-sample.git HEAD:feature/kubernetes-manifests
+                        """
+
+                        // Return to the original branch (if required)
+                        sh 'git checkout feature/jenkinsfile-adservice'
+                        
+                        // Apply the stashed changes back (if any)
+                        sh 'git stash pop || true'
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Pipeline completed successfully for ${SERVICE_NAME}!"
+        }
+        failure {
+            echo "Pipeline failed for ${SERVICE_NAME}. Please check logs for details."
+        }
+    }
+}
