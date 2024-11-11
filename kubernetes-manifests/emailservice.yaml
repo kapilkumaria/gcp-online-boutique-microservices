@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: emailservice
-          image: kappu1512/emailservice:6
+          image: kappu1512/emailservice:7
           ports:
             - containerPort: 8080
           env:
