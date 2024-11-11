@@ -137,7 +137,8 @@ pipeline {
             ]) {
 
                  // Clean the workspace directory before cloning
-                sh 'rm -rf ./*'
+//                sh 'rm -rf ./*'
+                sh 'rm -rf ./* ./.??*'
                 
                 // Clone the repository
                 sh 'git clone https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/gcp-online-boutique-microservices.git .'
