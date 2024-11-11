@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: kappu1512/frontend:latest  # Replace with your actual image path
+          image: kappu1512/frontend:7
           ports:
             - containerPort: 8080
           env:
