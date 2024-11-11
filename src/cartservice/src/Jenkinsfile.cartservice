@@ -19,7 +19,7 @@ pipeline {
     stages {
         stage('Clean Workspace') {
             steps {
-                deleteDir() // Ensures a clean workspace at the beginning
+                deleteDir() // Ensures a clean workspace at the beginnings
             }
         }
             
