@@ -147,6 +147,7 @@ pipeline {
                 // Clone the repository
                 sh 'git clone -b feature/cicd https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/gcp-online-boutique-microservices.git .'
                 
+                
 
                 // Modify the manifest file with the new DockerHub image tag
                 def newImageTag = "${DOCKERHUB_IMAGE_TAG}/${SERVICE_NAME}:${BUILD_NUMBER}"
@@ -160,7 +161,7 @@ pipeline {
                     git config user.email "jenkins-bot@yourdomain.com"
                     git add kubernetes-manifests/cartservice.yaml
                     git commit -m "Update image tag for ${SERVICE_NAME} to DockerHub ${BUILD_NUMBER}"
-                    git push https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/gcp-online-boutique-microservices.git
+                    git push https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/gcp-online-boutique-microservices.git feature/cicd
                 """                
             }
          }
