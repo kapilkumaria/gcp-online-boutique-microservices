@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: checkoutservice
-          image: kappu1512/checkoutservice:latest
+          image: kappu1512/checkoutservice:8
           ports:
             - containerPort: 5050
           env:
