@@ -7,7 +7,7 @@ pipeline {
     }
 
     environment {
-        REPO_URL = 'https://github.com/kapilkumaria/microservices-demo-sample.git'
+        REPO_URL = 'https://github.com/kapilkumaria/gcp-online-boutique-microservices.git'
         SONARQUBE_SERVER = 'sonarQube'
         SONARQUBE_URL = 'http://52.2.64.174:9000'
         SONARQUBE_TOKEN = credentials('sonar-token') // SonarQube token stored in Jenkins
@@ -17,57 +17,16 @@ pipeline {
     }
     
     stages {
-        stage('Setup Environment') {
+        stage('Clean Workspace') {
             steps {
-                echo "Installing Docker, Dotnet SDK, and SonarScanner if not already installed"
-                sh '''
-                    # Check if Docker is installed
-                    if ! command -v docker &> /dev/null; then
-                        echo "Docker not found, installing..."
-                        curl -fsSL https://get.docker.com | sh
-                        sudo usermod -aG docker $USER
-                        newgrp docker
-                    else
-                        echo "Docker is already installed"
-                    fi
-                    
-                    # Install Dotnet SDK
-                    DOTNET_VERSION=8.0.100
-                    DOTNET_DOWNLOAD_URL="https://dotnetcli.azureedge.net/dotnet/Sdk/$DOTNET_VERSION/dotnet-sdk-$DOTNET_VERSION-linux-x64.tar.gz"
-                    INSTALL_DIR="/usr/share/dotnet"
-
-                    sudo rm -rf $INSTALL_DIR
-                    sudo mkdir -p $INSTALL_DIR
-
-                    curl -L $DOTNET_DOWNLOAD_URL -o dotnet-sdk.tar.gz
-                    sudo tar -zxf dotnet-sdk.tar.gz -C $INSTALL_DIR
-                    rm dotnet-sdk.tar.gz
-
-                    export PATH="$INSTALL_DIR:$PATH"
-                    echo "PATH after installation: $PATH"
-
-                    # Install dotnet-sonarscanner as a global tool if not already installed
-                    if ! dotnet tool list -g | grep -q dotnet-sonarscanner; then
-                        echo "Installing dotnet-sonarscanner"
-                        dotnet tool install --global dotnet-sonarscanner
-                    else
-                        echo "dotnet-sonarscanner is already installed"
-                    fi
-
-                    export PATH="$PATH:$HOME/.dotnet/tools"  # Make sure global tools are accessible
-
-                    # Verify installations
-                    docker --version
-                    dotnet --version
-                    dotnet sonarscanner --version || echo "SonarScanner installation verification failed; please check setup steps."
-                '''
+                deleteDir() // Ensures a clean workspace at the beginning
             }
         }
-
+            
         stage('Clone Repository') {
             steps {
                 echo "Cloning the repository from ${REPO_URL} for ${SERVICE_NAME}"
-                git url: "${REPO_URL}", branch: 'feature/jenkinsfile-cartservice'
+                git url: "${REPO_URL}", branch: 'feature/cicd'
             }
         }
 
@@ -172,50 +131,42 @@ pipeline {
                 }
             }
         }
+    
+         stage('Update Kubernetes Manifest for ArgoCD') {
+    steps {
+        script {
+            withCredentials([
+                string(credentialsId: 'GITHUB_TOKEN', variable: 'GITHUB_TOKEN'),
+                string(credentialsId: 'DOCKERHUB_IMAGE_TAG', variable: 'DOCKERHUB_IMAGE_TAG')
+            ]) {
 
-        stage('Update Kubernetes Manifest for ArgoCD') {
-            steps {
-                script {
-                    def manifestFile = "kubernetes-manifests/cartservice.yaml"
+                 // Clean the workspace directory before cloning
+//                sh 'rm -rf ./*'
+                sh 'rm -rf ./* ./.??*'
+                
+                // Clone the repository
+                sh 'git clone -b feature/cicd https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/gcp-online-boutique-microservices.git .'
+                
 
-                    withCredentials([
-                        string(credentialsId: 'GITHUB_TOKEN', variable: 'GITHUB_TOKEN'),
-                        string(credentialsId: 'DOCKERHUB_IMAGE_TAG', variable: 'DOCKERHUB_IMAGE_TAG')
-                    ]) {
-                        // Stash changes if needed (optional)
-                        sh 'git stash'
+                // Modify the manifest file with the new DockerHub image tag
+                def newImageTag = "${DOCKERHUB_IMAGE_TAG}/${SERVICE_NAME}:${BUILD_NUMBER}"
+                sh """
+                    sed -i 's|image: .*|image: ${newImageTag}|g' kubernetes-manifests/cartservice.yaml
+                """
 
-                        // Check out the branch with the Kubernetes manifests
-                        sh 'git fetch origin feature/kubernetes-manifests'
-                        sh 'git checkout feature/kubernetes-manifests'
-
-                        // Modify the manifest file with the new DockerHub image tag
-                        def newImageTag = "${DOCKERHUB_IMAGE_TAG}/${SERVICE_NAME}:${BUILD_NUMBER}"
-                        sh """
-                            export DOCKERHUB_IMAGE_TAG=${DOCKERHUB_IMAGE_TAG}
-                            export SERVICE_NAME=${SERVICE_NAME}
-                            export BUILD_NUMBER=${BUILD_NUMBER}
-                            sed -i 's|image: .*|image: ${newImageTag}|g' ${manifestFile}
-                        """
-
-                        // Commit and push the changes to the kubernetes manifests branch
-                        sh """
-                            git config user.name "jenkins-bot"
-                            git config user.email "jenkins-bot@yourdomain.com"
-                            git add ${manifestFile}
-                            git commit -m "Update image tag for ${SERVICE_NAME} to DockerHub ${BUILD_NUMBER}"
-                            git push https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/microservices-demo-sample.git HEAD:feature/kubernetes-manifests
-                        """
-
-                        // Return to the original branch (if required)
-                        sh 'git checkout feature/jenkinsfile-adservice'
-                        
-                        // Apply the stashed changes back (if any)
-                        sh 'git stash pop || true'
-                    }
-                }
+                // Commit and push the changes to the feature/kubernetes-manifests branch
+                sh """
+                    git config user.name "jenkins-bot"
+                    git config user.email "jenkins-bot@yourdomain.com"
+                    git add kubernetes-manifests/cartservice.yaml
+                    git commit -m "Update image tag for ${SERVICE_NAME} to DockerHub ${BUILD_NUMBER}"
+                    git push https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/gcp-online-boutique-microservices.git
+                """                
             }
-        }
+         }
+     }
+   }
+        
     }
 
     post {
