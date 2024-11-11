@@ -141,7 +141,7 @@ pipeline {
                 sh 'rm -rf ./* ./.??*'
                 
                 // Clone the repository
-                sh 'git clone https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/gcp-online-boutique-microservices.git .'
+                sh 'git clone -b feature/cicd https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/gcp-online-boutique-microservices.git .'
                 
 
                 // Modify the manifest file with the new DockerHub image tag
