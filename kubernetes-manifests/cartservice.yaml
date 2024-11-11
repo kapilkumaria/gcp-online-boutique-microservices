@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: cartservice
-          image: kappu1512/cartservice:47
+          image: kappu1512/cartservice:48
           ports:
             - containerPort: 7070
           env:
