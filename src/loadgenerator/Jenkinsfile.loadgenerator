@@ -1,0 +1,138 @@
+pipeline {
+    agent { label 'dev' }
+     parameters {
+        booleanParam(name: 'PUSH_TO_ECR', defaultValue: true, description: 'Push image to AWS ECR')
+        booleanParam(name: 'PUSH_TO_ARTIFACTORY', defaultValue: false, description: 'Push image to JFrog Artifactory')
+        booleanParam(name: 'PUSH_TO_DOCKERHUB', defaultValue: false, description: 'Push image to DockerHub')
+     }
+
+    environment {
+        REPO_URL = 'https://github.com/kapilkumaria/microservices-demo-sample.git' // Repository URL
+        SONARQUBE_SERVER = 'sonarQube' // SonarQube server name configured in Jenkins
+        SONARQUBE_URL = 'http://44.211.60.45:9000' // SonarQube server URL
+        SONARQUBE_TOKEN = credentials('sonar-token') // SonarQube token stored in Jenkins
+        SERVICE_NAME = 'loadgenerator' // Specific service name for this Jenkinsfile
+        ECR_REPO_MICROSERVICES = '931058976119.dkr.ecr.us-east-1.amazonaws.com/gcp-loadgenerator'
+        PATH = "/opt/sonar-scanner/sonar-scanner-4.8.0.2856-linux/bin:${env.PATH}"       
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                echo "Cloning the repository from ${REPO_URL} for ${SERVICE_NAME}"
+                git url: "${REPO_URL}", branch: 'feature/jenkinsfile-loadgenerator' // Clone specified branch
+            }
+        }        
+
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    withSonarQubeEnv('sonarQube') {
+
+                                   sh """
+                                        cd src/adservice
+                                        chmod +x ./gradlew
+                                        ./gradlew sonarqube || true \
+                                            --init-script /root/.gradle-init/init.gradle \
+                                            --no-daemon \
+                                            -Dsonar.projectKey=${SERVICE_NAME} \
+                                            -Dsonar.sources=. \
+                                            -Dsonar.host.url=$SONARQUBE_URL \
+                                            -Dsonar.login=$SONARQUBE_TOKEN
+                                    """
+
+                    }
+                }
+           }
+        }
+
+        stage('Build Docker Image {SERVICE_NAME}') {
+            steps {
+                echo "Building Docker image for ${SERVICE_NAME}"
+                sh """
+                    docker build -t ${SERVICE_NAME}:latest -f src/loadgenerator/Dockerfile src/loadgenerator
+                """
+            }
+        }
+
+        stage('Trivy Scan for Docker Web Image') {
+            steps {
+                sh "trivy image --severity HIGH,CRITICAL --exit-code 0 --scanners vuln ${SERVICE_NAME}:latest"
+            }
+        }
+
+        stage('Push AdService Image to AWS ECR') {
+            when {
+                expression { params.PUSH_TO_ECR }
+            }
+    
+            steps {
+               withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    
+                ]) {
+                    sh '''
+                      aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 931058976119.dkr.ecr.us-east-1.amazonaws.com
+                      docker tag ${SERVICE_NAME}:latest ${ECR_REPO_MICROSERVICES}:${BUILD_NUMBER}
+                      docker push ${ECR_REPO_MICROSERVICES}:${BUILD_NUMBER}
+                    '''
+                    }
+            }
+         }
+         
+        stage('Push AdService Image to JFrog Artifactory') {
+            when {
+                expression { params.PUSH_TO_ARTIFACTORY }
+            }
+            steps {
+              withCredentials([
+                    string(credentialsId: 'JFROG_URL', variable: 'JFROG_URL'),
+                    string(credentialsId: 'JFROG_USERNAME', variable: 'JFROG_USERNAME'),
+                    string(credentialsId: 'JFROG_TOKEN', variable: 'JFROG_TOKEN'),
+                    string(credentialsId: 'JFROG_IMAGE_TAG', variable: 'JFROG_IMAGE_TAG')                    
+                ]) {
+                sh '''
+ 
+                  echo "$JFROG_TOKEN" | docker login "$JFROG_URL" --username "$JFROG_USERNAME" --password-stdin
+
+                  docker tag $SERVICE_NAME:latest $JFROG_IMAGE_TAG/$SERVICE_NAME:$BUILD_NUMBER
+                  docker push $JFROG_IMAGE_TAG/$SERVICE_NAME:$BUILD_NUMBER
+                '''
+                echo "Web image pushed to JFrog Artifactory successfully."
+                }
+            }
+        }
+
+         stage('Push AdService Image to DockerHub') {
+            when {
+                expression { params.PUSH_TO_DOCKERHUB }
+            }
+            steps {
+              withCredentials([
+                    string(credentialsId: 'DOCKERHUB_URL', variable: 'DOCKERHUB_URL'), 
+                    string(credentialsId: 'DOCKERHUB_USERNAME', variable: 'DOCKERHUB_USERNAME'),
+                    string(credentialsId: 'DOCKERHUB_TOKEN', variable: 'DOCKERHUB_TOKEN'),
+                    string(credentialsId: 'DOCKERHUB_IMAGE_TAG', variable: 'DOCKERHUB_IMAGE_TAG'),
+
+              ]) {
+                sh '''
+                  echo "$DOCKERHUB_TOKEN" | docker login "$DOCKERHUB_URL" --username "$DOCKERHUB_USERNAME" --password-stdin
+                  docker tag $SERVICE_NAME:latest $DOCKERHUB_IMAGE_TAG/$SERVICE_NAME:$BUILD_NUMBER
+                  docker push $DOCKERHUB_IMAGE_TAG/$SERVICE_NAME:$BUILD_NUMBER
+                '''
+                echo "Web image pushed to DockerHub successfully."
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Pipeline completed successfully for ${SERVICE_NAME}!"
+        }
+        failure {
+            echo "Pipeline failed for ${SERVICE_NAME}. Please check logs for details."
+        }
+    }
+}
