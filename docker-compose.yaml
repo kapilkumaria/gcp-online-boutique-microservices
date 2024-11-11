@@ -1,0 +1,160 @@
+version: '3.8'
+
+services:
+  adservice:
+    build:
+      context: ./src/adservice # Path to the directory containing the Dockerfile
+    container_name: adservice
+    ports:
+      - "9555:9555" # Exposed port for this service
+    networks:
+      - app-network
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+
+  cartservice:
+    build:
+      context: ./src/cartservice/src
+    container_name: cartservice
+    ports:
+      - "7070:7070"
+    networks:
+      - app-network
+    environment:
+      - DOTNET_EnableDiagnostics=0
+      - ASPNETCORE_HTTP_PORTS=7070
+      - REDIS_ADDR=redis:6379
+
+  checkoutservice:
+    build:
+      context: ./src/checkoutservice
+    container_name: checkoutservice
+    ports:
+      - "5050:5050"
+    networks:
+      - app-network
+    environment:
+      - GOTRACEBACK=single
+      - SHIPPING_SERVICE_ADDR=shippingservice:50051  # Address of shippingservice
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550  # Address of productcatalogservice
+      - CART_SERVICE_ADDR=cartservice:7070  # Address of cartservice
+      - CURRENCY_SERVICE_ADDR=currencyservice:7000  # Address of currencyservice
+      - EMAIL_SERVICE_ADDR=emailservice:8080  # Address of emailservice
+      - PAYMENT_SERVICE_ADDR=paymentservice:50051  # Address of paymentservice
+
+  currencyservice:
+    build:
+      context: ./src/currencyservice
+    container_name: currencyservice
+    ports:
+      - "7000:7000"
+    networks:
+      - app-network
+    environment:
+      - PORT=7000  # Define the gRPC server port
+      - DISABLE_PROFILER=true   # Disable Google Cloud Profiler
+
+  emailservice:
+    build:
+      context: ./src/emailservice
+    container_name: emailservice
+    ports:
+      - "8081:8080"
+    networks:
+      - app-network
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ENABLE_PROFILER=1  
+
+
+  frontend:
+    build:
+      context: ./src/frontend
+    container_name: frontend
+    ports:
+      - "8080:8080"
+    networks:
+      - app-network
+    environment:
+      - GOTRACEBACK=single
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550  # Address of productcatalogservice
+      - CURRENCY_SERVICE_ADDR=currencyservice:7000  # Address of currencyservice
+      - CART_SERVICE_ADDR=cartservice:7070  # Address of cartservice
+      - RECOMMENDATION_SERVICE_ADDR=recommendationservice:8082   # Address of recommendationservice
+      - CHECKOUT_SERVICE_ADDR=checkoutservice:5050  # Address of checkoutservice
+      - SHIPPING_SERVICE_ADDR=shippingservice:50051  # Address of shippingservice
+      - AD_SERVICE_ADDR=adservice:9555  # Address of adservice
+      - SHOPPING_ASSISTANT_SERVICE_ADDR=shoppingassistantservice:XXXX  # Set the appropriate port for shoppingassistantservice
+
+
+  loadgenerator:
+    build:
+      context: ./src/loadgenerator
+    container_name: loadgenerator
+    networks:
+      - app-network
+    environment:
+      - GEVENT_SUPPORT=True
+
+    
+
+  paymentservice:
+    build:
+      context: ./src/paymentservice
+    container_name: paymentservice
+    ports:
+      - "50052:50051"
+    networks:
+      - app-network
+    environment:
+      - PORT=50051  # Define the gRPC server port
+      - DISABLE_PROFILER=true    # Disable Google Cloud Profiler (adjust if different flag is needed)
+
+
+  productcatalogservice:
+    build:
+      context: ./src/productcatalogservice
+    container_name: productcatalogservice
+    ports:
+      - "3550:3550"
+    networks:
+      - app-network
+    environment:
+      - GOTRACEBACK=single
+
+
+  recommendationservice:
+    build:
+      context: ./src/recommendationservice
+    container_name: recommendationservice
+    ports:
+      - "8082:8080"
+    networks:
+      - app-network
+    environment:
+      - PORT=8080
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550  # Address of productcatalogservice
+      - DISABLE_PROFILER=true  # Disable Stackdriver Profiler if supported
+
+
+  shippingservice:
+    build:
+      context: ./src/shippingservice
+    container_name: shippingservice
+    ports:
+      - "50051:50051"
+    networks:
+      - app-network
+    environment:
+      - GOTRACEBACK=single
+
+
+networks:
+  app-network:
+    external: true
