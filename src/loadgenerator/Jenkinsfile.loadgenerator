@@ -63,10 +63,12 @@ pipeline {
 
         stage('Trivy Scan for Docker Web Image') {
             steps {
-                // Skip database update and use the cached DB
+     
+                 // Skip database update and use the cached DB
                 sh "trivy --cache-dir /var/cache/trivy image --skip-update --severity HIGH,CRITICAL --exit-code 0 --scanners vuln ${SERVICE_NAME}:latest"
             }
         }
+        
 
 
         stage('Push AdService Image to AWS ECR') {
