@@ -61,7 +61,7 @@ pipeline {
             }
         }
 
-        stages {
+        
         stage('Trivy DB Download') {
             steps {
                 script {
@@ -193,5 +193,4 @@ pipeline {
             echo "Pipeline failed for ${SERVICE_NAME}. Please check logs for details."
         }
     }
-}
 }
