@@ -64,8 +64,8 @@ pipeline {
         stage('Trivy Scan for Docker Web Image') {
             steps {
 //                sh "trivy image --severity HIGH,CRITICAL --exit-code 0 --scanners vuln ${SERVICE_NAME}:latest"
+                sh "trivy --download-db-only --cache-dir /var/cache/trivy"
                 sh "trivy --cache-dir /var/cache/trivy image --severity HIGH,CRITICAL --exit-code 0 --scanners vuln ${SERVICE_NAME}:latest"
-
             }
         }
 
