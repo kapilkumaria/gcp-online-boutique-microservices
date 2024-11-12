@@ -64,7 +64,7 @@ pipeline {
         stage('Trivy DB Download') {
             steps {
                 script {
-                    def trivyDbPath = '/var/cache/trivy/db"
+                    def trivyDbPath = '/var/cache/trivy/db'
                     if (!fileExists("${trivyDbPath}")) {
                         // Perform a lightweight scan to download and cache the DB
                         sh "trivy --cache-dir /var/cache/trivy image alpine:latest || true"
