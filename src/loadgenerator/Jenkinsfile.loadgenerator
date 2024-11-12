@@ -61,13 +61,14 @@ pipeline {
             }
         }
 
-        stage('Trivy DB Update') {
+        stages {
+        stage('Trivy DB Download') {
             steps {
                 script {
                     def trivyDbPath = '/var/cache/trivy/db'
                     if (!fileExists("${trivyDbPath}")) {
-                        // Initial database download if not present
-                        sh "trivy --cache-dir /var/cache/trivy image alpine:latest || true"
+                        // Force database download by running Trivy in update-only mode on an empty scan
+                        sh "trivy --cache-dir /var/cache/trivy image --download-db-only alpine:latest || true"
                     }
                 }
             }
@@ -75,7 +76,7 @@ pipeline {
         
         stage('Trivy Scan for Docker Web Image') {
             steps {
-                // Skip database update for subsequent scans
+                // Run Trivy scan with database, skipping additional updates
                 sh "trivy --cache-dir /var/cache/trivy image --skip-db-update --severity HIGH,CRITICAL --exit-code 0 --scanners vuln ${SERVICE_NAME}:latest"
             }
         }
