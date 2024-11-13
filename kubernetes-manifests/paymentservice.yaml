@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: paymentservice
-          image: kappu1512/paymentservice:latest  # Replace with your actual image path
+          image: kappu1512/paymentservice:9
           ports:
             - containerPort: 50051
           env:
