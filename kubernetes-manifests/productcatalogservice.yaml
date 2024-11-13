@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: productcatalogservice
-          image: kappu1512/productcatalogservice:8
+          image: kappu1512/productcatalogservice:9
           ports:
             - containerPort: 3550
           env:
