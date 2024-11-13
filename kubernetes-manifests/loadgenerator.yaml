@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: loadgenerator
-          image: kappu1512/loadgenerator:17
+          image: kappu1512/loadgenerator:18
           env:
             - name: GEVENT_SUPPORT
               value: "True"
