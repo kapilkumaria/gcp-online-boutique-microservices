@@ -7,7 +7,7 @@ pipeline {
     }
 
     environment {
-        REPO_URL = 'https://github.com/kapilkumaria/microservices-demo-sample.git' // Repository URL
+        REPO_URL = 'https://github.com/kapilkumaria/gcp-online-boutique-microservices.git' // Repository URL
         SONARQUBE_SERVER = 'sonarQube' // SonarQube server name configured in Jenkins
         SONARQUBE_URL = 'http://52.2.64.174:9000' // SonarQube server URL
         SONARQUBE_TOKEN = credentials('sonar-token') // SonarQube token stored in Jenkins
@@ -17,10 +17,16 @@ pipeline {
     }
 
     stages {
+        stage('Clean Workspace') {
+            steps {
+                deleteDir() // Ensures a clean workspace at the beginning
+            }
+        }
+
         stage('Clone Repository') {
             steps {
                 echo "Cloning the repository from ${REPO_URL} for ${SERVICE_NAME}"
-                git url: "${REPO_URL}", branch: 'feature/jenkinsfile-shoppingassistantservice' // Clone specified branch
+                git url: "${REPO_URL}", branch: 'feature/cicd' // Clone specified branch
             }
         }        
 
@@ -124,6 +130,41 @@ pipeline {
                 }
             }
         }
+
+        stage('Update Kubernetes Manifest for ArgoCD') {
+    steps {
+        script {
+            withCredentials([
+                string(credentialsId: 'GITHUB_TOKEN', variable: 'GITHUB_TOKEN'),
+                string(credentialsId: 'DOCKERHUB_IMAGE_TAG', variable: 'DOCKERHUB_IMAGE_TAG')
+            ]) {
+
+                 // Clean the workspace directory before cloning
+//                sh 'rm -rf ./*'
+                sh 'rm -rf ./* ./.??*'
+                
+                // Clone the repository
+                sh 'git clone -b feature/cicd https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/gcp-online-boutique-microservices.git .'
+                
+
+                // Modify the manifest file with the new DockerHub image tag
+                def newImageTag = "${DOCKERHUB_IMAGE_TAG}/${SERVICE_NAME}:${BUILD_NUMBER}"
+                sh """
+                    sed -i 's|image: .*|image: ${newImageTag}|g' kubernetes-manifests/shoppingassistantservice.yaml
+                """
+
+                // Commit and push the changes to the feature/kubernetes-manifests branch
+                sh """
+                    git config user.name "jenkins-bot"
+                    git config user.email "jenkins-bot@yourdomain.com"
+                    git add kubernetes-manifests/shoppingassistantservice.yaml
+                    git commit -m "Update image tag for ${SERVICE_NAME} to DockerHub ${BUILD_NUMBER}"
+                    git push https://jenkins-bot:${GITHUB_TOKEN}@github.com/kapilkumaria/gcp-online-boutique-microservices.git
+                """                
+            }
+         }
+     }
+   }
     }
 
     post {
