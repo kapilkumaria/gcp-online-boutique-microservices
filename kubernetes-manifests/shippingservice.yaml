@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: shippingservice
-          image: kappu1512/shippingservice:latest  # Replace with your actual image path
+          image: kappu1512/shippingservice:5
           ports:
             - containerPort: 50051
           env:
