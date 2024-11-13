@@ -61,28 +61,12 @@ pipeline {
             }
         }
 
-        stage('Trivy DB Download') {
-            steps {
-                script {
-                    def trivyDbPath = '/var/cache/trivy/db'
-                    if (!fileExists("${trivyDbPath}")) {
-                        // Perform a lightweight scan to download and cache the DB
-                        sh "trivy --cache-dir /var/cache/trivy image alpine:latest || true"
-                    }
-                }
-            }
-        }
-        
         stage('Trivy Scan for Docker Web Image') {
             steps {
-                // Now run the actual scan, skipping the DB update
-                sh "trivy --cache-dir /var/cache/trivy image --skip-db-update --severity HIGH,CRITICAL --exit-code 0 --scanners vuln ${SERVICE_NAME}:latest"
+                sh "trivy image --severity HIGH,CRITICAL --exit-code 0 --scanners vuln ${SERVICE_NAME}:latest"
             }
-        }
+        }      
         
-        
-
-
         stage('Push AdService Image to AWS ECR') {
             when {
                 expression { params.PUSH_TO_ECR }
