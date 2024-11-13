@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: recommendationservice
-          image: kappu1512/recommendationservice:7
+          image: kappu1512/recommendationservice:8
           ports:
             - containerPort: 8080
           env:
