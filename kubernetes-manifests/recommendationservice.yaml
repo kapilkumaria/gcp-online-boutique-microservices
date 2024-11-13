@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: recommendationservice
-          image: kappu1512/recommendationservice:latest  # Replace with your actual image path
+          image: kappu1512/recommendationservice:6
           ports:
             - containerPort: 8080
           env:
