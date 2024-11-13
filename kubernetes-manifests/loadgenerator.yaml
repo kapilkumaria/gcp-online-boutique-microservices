@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: loadgenerator
-          image: kappu1512/loadgenerator:latest  # Replace with your actual image path
+          image: kappu1512/loadgenerator:17
           env:
             - name: GEVENT_SUPPORT
               value: "True"
