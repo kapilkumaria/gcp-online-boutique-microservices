@@ -49,7 +49,7 @@ metadata:
   labels:
     app: frontend
 spec:
-  type: ClusterIP  # Use LoadBalancer if external access is needed
+  type: LoadBalancer  # Use LoadBalancer if external access is needed
   selector:
     app: frontend
   ports:
